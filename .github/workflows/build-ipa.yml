@@ -1,0 +1,45 @@
+name: Build MAUI iOS IPA (Unsigned)
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install .NET 9.0 SDK
+        run: |
+          brew install --cask dotnet-sdk
+      
+      - name: Install MAUI iOS workload
+        run: |
+          dotnet workload install maui-ios
+      
+      - name: Restore dependencies (iOS only)
+        run: |
+          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFramework=net9.0-ios
+      
+      - name: Build unsigned IPA
+        run: |
+          dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
+            -f net9.0-ios \
+            -c Debug \
+            -p:ArchiveOnBuild=true \
+            -p:RuntimeIdentifier=ios-arm64 \
+            -p:TargetFrameworks=net9.0-ios \
+            -p:CodesignKey="" \
+            -p:CodesignProvision=""
+      
+      - name: Upload IPA as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenUtauMobile-unsigned
+          path: OpenUtauMobile/bin/Debug/net9.0-ios/ios-arm64/publish/*.ipa
