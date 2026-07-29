@@ -57,9 +57,7 @@ jobs:
 
       - name: Restore dependencies
         run: |
-          dotnet restore ${{ env.PROJECT_PATH }} \
-            -p:TargetFrameworks=${{ env.TARGET_FRAMEWORK }} \
-            -p:RuntimeIdentifier=${{ env.RUNTIME_IDENTIFIER }}
+          dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Build iOS IPA
         run: |
