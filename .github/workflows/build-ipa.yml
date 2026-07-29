@@ -30,7 +30,13 @@ jobs:
       
       - name: Restore dependencies (iOS only)
         run: |
-          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFramework=net10.0-ios
+          # 清缓存（解决权限警告）
+          sudo rm -rf ~/.local/share/NuGet/http-cache || true
+          # 分别 restore 每个项目，指定对应框架
+          dotnet restore OpenUtau.Core/OpenUtau.Core.csproj -p:TargetFramework=net10.0
+          dotnet restore OpenUtau.Plugin.Builtin/OpenUtau.Plugin.Builtin.csproj -p:TargetFramework=net10.0
+          dotnet restore OpenUtauMobile.Plugin.Renderers/OpenUtauMobile.Plugin.Renderers.csproj -p:TargetFramework=net10.0
+          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFrameworks="net10.0;net10.0-ios"
       
       - name: Build unsigned IPA
         run: |
