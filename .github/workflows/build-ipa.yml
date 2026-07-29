@@ -23,7 +23,6 @@ jobs:
       - name: Install .NET 10.0 SDK
         run: |
           brew install --cask dotnet-sdk
-          dotnat --version
       
       - name: Install MAUI iOS workload
         run: |
