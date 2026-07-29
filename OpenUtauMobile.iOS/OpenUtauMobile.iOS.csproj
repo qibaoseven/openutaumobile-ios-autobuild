@@ -3,7 +3,8 @@
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0-ios</TargetFramework>
         <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
-        <Nullable>enable</Nullable>
+	<Nullable>enable</Nullable>
+	<RuntimeIdentifiers>ios-arm64</RuntimeIdentifiers>
     </PropertyGroup>
 
 	<!-- iOS 配置 -->
