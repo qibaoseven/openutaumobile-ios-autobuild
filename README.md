@@ -1,5 +1,16 @@
 # OpenUtau Mobile Developer Preview
 
+⚠️ 重要声明
+
+本仓库为 OpenUtauMobile 的个人备份/镜像克隆，仅用于个人学习及 GitHub Actions 自动编译测试。
+
+· 非官方发布渠道，不提供技术支持，不接受 Issue 或 Pull Request。
+· 所有源码版权归原作者 vocoder712 及 OpenUtau 官方项目所有。
+· 本仓库不预置任何声库，请自行获取合法声库资源。
+
+📦 如需最新正式版或报告问题，请访问原作者仓库：
+👉 https://github.com/vocoder712/OpenUtauMobile
+
 ## Overview
 
 To solve the performance issues, outdated UI design, and cross-platform limitations of the first-generation implementation, the project is being rebuilt from scratch.
