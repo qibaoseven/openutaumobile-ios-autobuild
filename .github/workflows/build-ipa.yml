@@ -1,58 +1,110 @@
-name: Build MAUI iOS IPA (Unsigned)
+name: Build iOS (Experimental)
 
 on:
-  push:
-    branches: [ dev, main ]
-  pull_request:
-    branches: [ dev, main ]
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build Configuration'
+        required: true
+        default: 'Debug'
+        type: choice
+        options:
+          - Debug
+          - Release
+  push:
+    branches: [dev]
+    paths:
+      - '**/*.cs'
+      - '**/*.csproj'
+      - '**/*.sln'
+      - '.github/workflows/build-ios.yml'
+  pull_request:
+    branches: [dev]
+
+env:
+  DOTNET_VERSION: '10.0'
+  TARGET_FRAMEWORK: 'net10.0-ios'
+  RUNTIME_IDENTIFIER: 'ios-arm64'
+  PROJECT_PATH: 'OpenUtauMobile/OpenUtauMobile.csproj'
 
 jobs:
-  build:
-    runs-on: macos-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Fix Homebrew tap trust
-        run: |
-          brew untap aws/tap 2>/dev/null || true
-          echo "HOMEBREW_NO_REQUIRE_TAP_TRUST=1" >> $GITHUB_ENV
+  build-ios:
+    name: Build iOS
+    runs-on: macos-15
+    timeout-minutes: 60
 
-      - name: Install .NET 10.0 SDK
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      # 2. 设置 Xcode
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.3'
+
+      # 3. 安装 .NET 10 SDK
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '${{ env.DOTNET_VERSION }}.x'
+
+      # 4. 安装 iOS 工作负载
+      - name: Install .NET iOS Workload
         run: |
-          brew install --cask dotnet-sdk
-      
-      - name: Install MAUI iOS workload
+          dotnet workload install ios
+          dotnet workload list
+
+      # 5. 恢复依赖
+      - name: Restore dependencies
         run: |
-          sudo dotnet workload install maui-ios --no-cache
-      
-      - name: Restore dependencies (iOS only)
+          dotnet restore ${{ env.PROJECT_PATH }} \
+            -p:TargetFramework=${{ env.TARGET_FRAMEWORK }}
+
+      # 6. 构建 iOS 项目
+      - name: Build iOS
         run: |
-          # 清缓存（解决权限警告）
-          sudo rm -rf ~/.local/share/NuGet/http-cache || true
-          # 分别 restore 每个项目，指定对应框架
-          dotnet restore OpenUtau.Core/OpenUtau.Core.csproj -p:TargetFramework=net10.0
-          dotnet restore OpenUtau.Plugin.Builtin/OpenUtau.Plugin.Builtin.csproj -p:TargetFramework=net10.0
-          dotnet restore OpenUtauMobile.Plugin.Renderers/OpenUtauMobile.Plugin.Renderers.csproj -p:TargetFramework=net10.0
-          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFrameworks="net10.0;net10.0-ios"
-      
-      - name: Build unsigned IPA
+          dotnet build ${{ env.PROJECT_PATH }} \
+            -f ${{ env.TARGET_FRAMEWORK }} \
+            -c ${{ github.event.inputs.configuration || 'Debug' }} \
+            -p:RuntimeIdentifier=${{ env.RUNTIME_IDENTIFIER }} \
+            -p:TargetFrameworks=${{ env.TARGET_FRAMEWORK }} \
+            --no-restore
+        continue-on-error: true
+
+      # 7. 列出构建输出（用于调试）
+      - name: List build output
+        if: always()
         run: |
-          dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
-            -f net10.0-ios \
-            -c Debug \
-            -p:ArchiveOnBuild=true \
-            -p:RuntimeIdentifier=ios-arm64 \
-            -p:TargetFrameworks=net10.0-ios \
-            -p:CodesignKey="" \
-            -p:CodesignProvision="" \
-            -p:EnableCodeSigning=false \
-            -p:PackageFormat=ipa
-      
-      - name: Upload IPA as artifact
+          echo "=== Searching for build artifacts ==="
+          find . -name "*.app" -o -name "*.ipa" -o -name "*.dll" 2>/dev/null | head -20
+          echo "=== bin directory structure ==="
+          ls -R OpenUtauMobile/bin/ 2>/dev/null || echo "bin directory not found"
+
+      # 8. 上传构建日志（无论成功与否）
+      - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: OpenUtauMobile-unsigned
-          path: OpenUtauMobile/bin/Debug/net10.0-ios/ios-arm64/publish/*.ipa
+          name: ios-build-artifacts-${{ github.run_id }}
+          path: |
+            OpenUtauMobile/bin/
+            OpenUtauMobile/obj/
+          retention-days: 7
+
+      # 9. 上传编译产物（仅成功时）
+      - name: Upload iOS App
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenUtauMobile-iOS
+          path: |
+            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Debug' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
+            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Debug' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/*.app
+          if-no-files-found: warn
+          retention-days: 14
+
