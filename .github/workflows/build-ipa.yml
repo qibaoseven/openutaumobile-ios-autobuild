@@ -20,9 +20,10 @@ jobs:
           brew untap aws/tap 2>/dev/null || true
           echo "HOMEBREW_NO_REQUIRE_TAP_TRUST=1" >> $GITHUB_ENV
 
-      - name: Install .NET 9.0 SDK
+      - name: Install .NET 10.0 SDK
         run: |
           brew install --cask dotnet-sdk
+          dotnat --version
       
       - name: Install MAUI iOS workload
         run: |
@@ -30,16 +31,16 @@ jobs:
       
       - name: Restore dependencies (iOS only)
         run: |
-          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFramework=net9.0-ios
+          dotnet restore OpenUtauMobile/OpenUtauMobile.csproj -p:TargetFramework=net10.0-ios
       
       - name: Build unsigned IPA
         run: |
           dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
-            -f net9.0-ios \
+            -f net10.0-ios \
             -c Debug \
             -p:ArchiveOnBuild=true \
             -p:RuntimeIdentifier=ios-arm64 \
-            -p:TargetFrameworks=net9.0-ios \
+            -p:TargetFrameworks=net10.0-ios \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
             -p:EnableCodeSigning=false \
@@ -49,4 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OpenUtauMobile-unsigned
-          path: OpenUtauMobile/bin/Debug/net9.0-ios/ios-arm64/publish/*.ipa
+          path: OpenUtauMobile/bin/Debug/net10.0-ios/ios-arm64/publish/*.ipa
