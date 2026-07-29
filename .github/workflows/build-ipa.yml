@@ -1,4 +1,4 @@
-name: Build iOS (Experimental)
+name: Build iOS IPA
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       configuration:
         description: 'Build Configuration'
         required: true
-        default: 'Debug'
+        default: 'Release'
         type: choice
         options:
           - Debug
@@ -29,82 +29,68 @@ env:
 
 jobs:
   build-ios:
-    name: Build iOS
+    name: Build iOS IPA
     runs-on: macos-15
     timeout-minutes: 60
 
     steps:
-      # 1. 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: true
           fetch-depth: 0
 
-      # 2. 设置 Xcode
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.3'
 
-      # 3. 安装 .NET 10 SDK
       - name: Setup .NET ${{ env.DOTNET_VERSION }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '${{ env.DOTNET_VERSION }}.x'
 
-      # 4. 安装 iOS 工作负载
       - name: Install .NET iOS Workload
         run: |
           dotnet workload install ios
           dotnet workload list
 
-      # 5. 恢复依赖
       - name: Restore dependencies
         run: |
           dotnet restore ${{ env.PROJECT_PATH }} \
             -p:TargetFramework=${{ env.TARGET_FRAMEWORK }}
 
-      # 6. 构建 iOS 项目
-      - name: Build iOS
+      - name: Build iOS IPA
         run: |
-          dotnet build ${{ env.PROJECT_PATH }} \
+          dotnet publish ${{ env.PROJECT_PATH }} \
             -f ${{ env.TARGET_FRAMEWORK }} \
-            -c ${{ github.event.inputs.configuration || 'Debug' }} \
+            -c ${{ github.event.inputs.configuration || 'Release' }} \
+            -r ${{ env.RUNTIME_IDENTIFIER }} \
+            -p:ArchiveOnBuild=true \
             -p:RuntimeIdentifier=${{ env.RUNTIME_IDENTIFIER }} \
             -p:TargetFrameworks=${{ env.TARGET_FRAMEWORK }} \
+            -p:CodesignKey="" \
+            -p:CodesignProvision="" \
+            -p:EnableCodeSigning=false \
+            -p:BuildIpa=true \
             --no-restore
-        continue-on-error: true
 
-      # 7. 列出构建输出（用于调试）
-      - name: List build output
-        if: always()
-        run: |
-          echo "=== Searching for build artifacts ==="
-          find . -name "*.app" -o -name "*.ipa" -o -name "*.dll" 2>/dev/null | head -20
-          echo "=== bin directory structure ==="
-          ls -R OpenUtauMobile/bin/ 2>/dev/null || echo "bin directory not found"
-
-      # 8. 上传构建日志（无论成功与否）
-      - name: Upload build artifacts
-        if: always()
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build-artifacts-${{ github.run_id }}
+          name: OpenUtauMobile-iOS-IPA
+          path: |
+            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload build artifacts (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-fallback-${{ github.run_id }}
           path: |
             OpenUtauMobile/bin/
             OpenUtauMobile/obj/
           retention-days: 7
-
-      # 9. 上传编译产物（仅成功时）
-      - name: Upload iOS App
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenUtauMobile-iOS
-          path: |
-            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Debug' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
-            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Debug' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/*.app
-          if-no-files-found: warn
-          retention-days: 14
 
