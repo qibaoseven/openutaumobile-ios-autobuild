@@ -25,7 +25,7 @@ env:
   DOTNET_VERSION: '10.0'
   TARGET_FRAMEWORK: 'net10.0-ios'
   RUNTIME_IDENTIFIER: 'ios-arm64'
-  PROJECT_PATH: 'OpenUtauMobile/OpenUtauMobile.csproj'
+  PROJECT_PATH: 'OpenUtauMobile.iOS/OpenUtauMobile.iOS.csproj'
 
 jobs:
   build-ios:
@@ -58,7 +58,8 @@ jobs:
       - name: Restore dependencies
         run: |
           dotnet restore ${{ env.PROJECT_PATH }} \
-            -p:TargetFramework=${{ env.TARGET_FRAMEWORK }}
+            -p:TargetFrameworks=${{ env.TARGET_FRAMEWORK }} \
+            -p:RuntimeIdentifier=${{ env.RUNTIME_IDENTIFIER }}
 
       - name: Build iOS IPA
         run: |
@@ -80,7 +81,7 @@ jobs:
         with:
           name: OpenUtauMobile-iOS-IPA
           path: |
-            OpenUtauMobile/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
+            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
           if-no-files-found: warn
           retention-days: 14
 
@@ -90,7 +91,7 @@ jobs:
         with:
           name: ios-build-fallback-${{ github.run_id }}
           path: |
-            OpenUtauMobile/bin/
-            OpenUtauMobile/obj/
+            OpenUtauMobile.iOS/bin/
+            OpenUtauMobile.iOS/obj/
           retention-days: 7
 
