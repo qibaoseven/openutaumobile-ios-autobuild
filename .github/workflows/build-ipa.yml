@@ -6,7 +6,7 @@ on:
       configuration:
         description: 'Build Configuration'
         required: true
-        default: 'Release'
+        default: 'Debug'
         type: choice
         options:
           - Debug
@@ -55,7 +55,6 @@ jobs:
           dotnet workload install ios
           dotnet workload list
 
-      # ===== 新增：创建 link.xml 绕过 AppKit =====
       - name: Create link.xml to skip AppKit
         run: |
           mkdir -p OpenUtauMobile.iOS
@@ -70,7 +69,6 @@ jobs:
           echo "✅ link.xml created:"
           cat OpenUtauMobile.iOS/link.xml
 
-      # ===== 新增：调试 - 扫描 AppKit 引用（可选，可以先跑一次看看） =====
       - name: Debug - Scan for AppKit references
         run: |
           echo "=== Scanning .cs files for AppKit ==="
@@ -83,20 +81,13 @@ jobs:
         run: |
           dotnet restore ${{ env.PROJECT_PATH }}
 
-      # ===== 修改：添加 bypass AppKit 的参数 =====
-      - name: Build iOS IPA
+      - name: Build .app (unsigned)
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} \
             -f ${{ env.TARGET_FRAMEWORK }} \
-            -c ${{ github.event.inputs.configuration || 'Release' }} \
+            -c ${{ github.event.inputs.configuration || 'Debug' }} \
             -r ${{ env.RUNTIME_IDENTIFIER }} \
-            -p:ArchiveOnBuild=true \
-            -p:RuntimeIdentifier=${{ env.RUNTIME_IDENTIFIER }} \
-            -p:TargetFrameworks=${{ env.TARGET_FRAMEWORK }} \
-            -p:CodesignKey="" \
-            -p:CodesignProvision="" \
             -p:EnableCodeSigning=false \
-            -p:BuildIpa=true \
             -p:MtouchLink=Full \
             -p:MtouchExtraArgs="--linkskip=AppKit --link-ignore=AppKit" \
             -p:TrimmerRootAssembly="OpenUtau.Core" \
@@ -106,12 +97,32 @@ jobs:
             -p:TrimmerRootDescriptor="OpenUtauMobile.iOS/link.xml" \
             --no-restore
 
+      - name: Package .app to .ipa (unsigned)
+        run: |
+          CONFIG="${{ github.event.inputs.configuration || 'Debug' }}"
+          APP_PATH="OpenUtauMobile.iOS/bin/${CONFIG}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/OpenUtauMobile.iOS.app"
+          
+          echo "Looking for .app at: $APP_PATH"
+          
+          if [ -d "$APP_PATH" ]; then
+            echo "✅ .app found at $APP_PATH"
+            mkdir -p Payload
+            cp -r "$APP_PATH" Payload/
+            zip -r OpenUtauMobile.ipa Payload
+            echo "✅ IPA created successfully (unsigned)"
+            ls -lh OpenUtauMobile.ipa
+          else
+            echo "❌ .app not found at $APP_PATH"
+            echo "Trying to find .app anywhere in bin folder..."
+            find OpenUtauMobile.iOS/bin -name "*.app" -type d 2>/dev/null || echo "No .app found"
+            exit 1
+          fi
+
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: OpenUtauMobile-iOS-IPA
-          path: |
-            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
+          path: OpenUtauMobile.ipa
           if-no-files-found: warn
           retention-days: 14
 
