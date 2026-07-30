@@ -111,7 +111,7 @@ jobs:
         with:
           name: OpenUtauMobile-iOS-IPA
           path: |
-            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER ]}/publish/*.ipa
+            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
           if-no-files-found: warn
           retention-days: 14
 
