@@ -31,7 +31,7 @@ jobs:
   build-ios:
     name: Build iOS IPA
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
@@ -55,10 +55,35 @@ jobs:
           dotnet workload install ios
           dotnet workload list
 
+      # ===== 新增：创建 link.xml 绕过 AppKit =====
+      - name: Create link.xml to skip AppKit
+        run: |
+          mkdir -p OpenUtauMobile.iOS
+          cat > OpenUtauMobile.iOS/link.xml << 'EOF'
+          <linker>
+            <assembly fullname="OpenUtau.Core" preserve="all"/>
+            <assembly fullname="OpenUtauMobile" preserve="all"/>
+            <assembly fullname="OpenUtau.Plugin.Builtin" preserve="all"/>
+            <assembly fullname="OpenUtauMobile.Plugin.Renderers" preserve="all"/>
+          </linker>
+          EOF
+          echo "✅ link.xml created:"
+          cat OpenUtauMobile.iOS/link.xml
+
+      # ===== 新增：调试 - 扫描 AppKit 引用（可选，可以先跑一次看看） =====
+      - name: Debug - Scan for AppKit references
+        run: |
+          echo "=== Scanning .cs files for AppKit ==="
+          grep -rn "AppKit" --include="*.cs" . || echo "✅ No AppKit in .cs files"
+          echo ""
+          echo "=== Scanning .csproj files for AppKit ==="
+          grep -rn "AppKit" --include="*.csproj" . || echo "✅ No AppKit in .csproj files"
+
       - name: Restore dependencies
         run: |
           dotnet restore ${{ env.PROJECT_PATH }}
 
+      # ===== 修改：添加 bypass AppKit 的参数 =====
       - name: Build iOS IPA
         run: |
           dotnet publish ${{ env.PROJECT_PATH }} \
@@ -72,6 +97,13 @@ jobs:
             -p:CodesignProvision="" \
             -p:EnableCodeSigning=false \
             -p:BuildIpa=true \
+            -p:MtouchLink=Full \
+            -p:MtouchExtraArgs="--linkskip=AppKit --link-ignore=AppKit" \
+            -p:TrimmerRootAssembly="OpenUtau.Core" \
+            -p:TrimmerRootAssembly="OpenUtauMobile" \
+            -p:TrimmerRootAssembly="OpenUtau.Plugin.Builtin" \
+            -p:TrimmerRootAssembly="OpenUtauMobile.Plugin.Renderers" \
+            -p:TrimmerRootDescriptor="OpenUtauMobile.iOS/link.xml" \
             --no-restore
 
       - name: Upload IPA
@@ -79,7 +111,7 @@ jobs:
         with:
           name: OpenUtauMobile-iOS-IPA
           path: |
-            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/*.ipa
+            OpenUtauMobile.iOS/bin/${{ github.event.inputs.configuration || 'Release' }}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER ]}/publish/*.ipa
           if-no-files-found: warn
           retention-days: 14
 
@@ -92,4 +124,3 @@ jobs:
             OpenUtauMobile.iOS/bin/
             OpenUtauMobile.iOS/obj/
           retention-days: 7
-
