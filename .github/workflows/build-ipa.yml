@@ -55,7 +55,7 @@ jobs:
           dotnet workload install ios
           dotnet workload list
 
-      - name: Create link.xml to skip AppKit
+      - name: Create link.xml
         run: |
           mkdir -p OpenUtauMobile.iOS
           cat > OpenUtauMobile.iOS/link.xml << 'EOF'
@@ -66,8 +66,7 @@ jobs:
             <assembly fullname="OpenUtauMobile.Plugin.Renderers" preserve="all"/>
           </linker>
           EOF
-          echo "✅ link.xml created:"
-          cat OpenUtauMobile.iOS/link.xml
+          echo "✅ link.xml created"
 
       - name: Debug - Scan for AppKit references
         run: |
@@ -88,8 +87,8 @@ jobs:
             -c ${{ github.event.inputs.configuration || 'Debug' }} \
             -r ${{ env.RUNTIME_IDENTIFIER }} \
             -p:EnableCodeSigning=false \
-            -p:MtouchLink=Full \
-            -p:MtouchExtraArgs="--linkskip=AppKit --link-ignore=AppKit" \
+            -p:MtouchLink=SdkOnly \
+            -p:MtouchExtraArgs="-gcc_flags '-Wl,-weak_framework,AppKit'" \
             -p:TrimmerRootAssembly="OpenUtau.Core" \
             -p:TrimmerRootAssembly="OpenUtauMobile" \
             -p:TrimmerRootAssembly="OpenUtau.Plugin.Builtin" \
@@ -97,26 +96,67 @@ jobs:
             -p:TrimmerRootDescriptor="OpenUtauMobile.iOS/link.xml" \
             --no-restore
 
-      - name: Package .app to .ipa (unsigned)
+      - name: Find and verify .app
         run: |
           CONFIG="${{ github.event.inputs.configuration || 'Debug' }}"
-          APP_PATH="OpenUtauMobile.iOS/bin/${CONFIG}/${{ env.TARGET_FRAMEWORK }}/${{ env.RUNTIME_IDENTIFIER }}/publish/OpenUtauMobile.iOS.app"
           
-          echo "Looking for .app at: $APP_PATH"
+          # 搜索 .app 文件的实际位置
+          echo "🔍 Searching for .app bundle..."
+          APP_PATH=$(find OpenUtauMobile.iOS/bin -name "*.app" -type d -print -quit 2>/dev/null || echo "")
           
-          if [ -d "$APP_PATH" ]; then
-            echo "✅ .app found at $APP_PATH"
-            mkdir -p Payload
-            cp -r "$APP_PATH" Payload/
-            zip -r OpenUtauMobile.ipa Payload
-            echo "✅ IPA created successfully (unsigned)"
-            ls -lh OpenUtauMobile.ipa
+          if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
+            echo "✅ Found .app at: $APP_PATH"
+            
+            # 获取二进制文件名（从 Info.plist 读取）
+            BINARY_NAME=$(plutil -extract CFBundleExecutable raw "$APP_PATH/Info.plist" 2>/dev/null || echo "")
+            if [ -z "$BINARY_NAME" ]; then
+              # 如果读取失败，用文件夹名
+              BINARY_NAME=$(basename "$APP_PATH" .app)
+            fi
+            
+            BINARY_PATH="$APP_PATH/$BINARY_NAME"
+            
+            if [ -f "$BINARY_PATH" ]; then
+              echo "🔍 Checking binary for AppKit references..."
+              if otool -L "$BINARY_PATH" 2>/dev/null | grep -q AppKit; then
+                echo "⚠️ WARNING: AppKit still found in binary!"
+                otool -L "$BINARY_PATH" | grep AppKit
+              else
+                echo "✅ AppKit successfully stripped from binary."
+              fi
+              
+              # 保存路径供后续步骤使用
+              echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+            else
+              echo "⚠️ Binary not found at expected path: $BINARY_PATH"
+              echo "Checking binary name from Info.plist..."
+              plutil -p "$APP_PATH/Info.plist" || true
+            fi
           else
-            echo "❌ .app not found at $APP_PATH"
-            echo "Trying to find .app anywhere in bin folder..."
-            find OpenUtauMobile.iOS/bin -name "*.app" -type d 2>/dev/null || echo "No .app found"
+            echo "❌ No .app bundle found in bin folder!"
+            echo "Contents of bin folder:"
+            find OpenUtauMobile.iOS/bin -type d -maxdepth 3 2>/dev/null || echo "No bin folder"
             exit 1
           fi
+
+      - name: Package .app to .ipa (unsigned)
+        run: |
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ APP_PATH not set, searching again..."
+            APP_PATH=$(find OpenUtauMobile.iOS/bin -name "*.app" -type d -print -quit 2>/dev/null || echo "")
+          fi
+          
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "❌ No .app found to package"
+            exit 1
+          fi
+          
+          echo "📦 Packaging: $APP_PATH"
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r OpenUtauMobile.ipa Payload
+          echo "✅ IPA created successfully"
+          ls -lh OpenUtauMobile.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
