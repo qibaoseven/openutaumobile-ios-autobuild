@@ -1,17 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0-ios</TargetFramework>
         <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
-	<Nullable>enable</Nullable>
-	<RuntimeIdentifiers>ios-arm64</RuntimeIdentifiers>
+        <Nullable>enable</Nullable>
+        <RuntimeIdentifiers>ios-arm64</RuntimeIdentifiers>
     </PropertyGroup>
 
-	<!-- iOS 配置 -->
-	<PropertyGroup>
-		<!-- 禁用 IL 链接器以避免 DryWetMidi 等库的问题 -->
-		<MtouchLink>None</MtouchLink>
-	</PropertyGroup>
+    <!-- iOS 配置 -->
+    <PropertyGroup>
+        <!-- 改为 SdkOnly，让链接器处理 SDK 部分，同时排除 AppKit -->
+        <MtouchLink>SdkOnly</MtouchLink>
+        <!-- 关键：让 AppKit 变成弱链接，iOS 上找不到也不会崩溃 -->
+        <MtouchExtraArgs>-gcc_flags -Wl,-weak_framework,AppKit</MtouchExtraArgs>
+    </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Avalonia.iOS" Version="$(AvaloniaVersion)"/>

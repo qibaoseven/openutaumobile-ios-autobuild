@@ -87,8 +87,6 @@ jobs:
             -c ${{ github.event.inputs.configuration || 'Debug' }} \
             -r ${{ env.RUNTIME_IDENTIFIER }} \
             -p:EnableCodeSigning=false \
-            -p:MtouchLink=SdkOnly \
-            -p:MtouchExtraArgs="-gcc_flags -Wl,-weak_framework,AppKit" \
             -p:TrimmerRootAssembly="OpenUtau.Core" \
             -p:TrimmerRootAssembly="OpenUtauMobile" \
             -p:TrimmerRootAssembly="OpenUtau.Plugin.Builtin" \
