@@ -100,17 +100,14 @@ jobs:
         run: |
           CONFIG="${{ github.event.inputs.configuration || 'Debug' }}"
           
-          # 搜索 .app 文件的实际位置
           echo "🔍 Searching for .app bundle..."
           APP_PATH=$(find OpenUtauMobile.iOS/bin -name "*.app" -type d -print -quit 2>/dev/null || echo "")
           
           if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
             echo "✅ Found .app at: $APP_PATH"
             
-            # 获取二进制文件名（从 Info.plist 读取）
             BINARY_NAME=$(plutil -extract CFBundleExecutable raw "$APP_PATH/Info.plist" 2>/dev/null || echo "")
             if [ -z "$BINARY_NAME" ]; then
-              # 如果读取失败，用文件夹名
               BINARY_NAME=$(basename "$APP_PATH" .app)
             fi
             
@@ -125,16 +122,13 @@ jobs:
                 echo "✅ AppKit successfully stripped from binary."
               fi
               
-              # 保存路径供后续步骤使用
               echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
             else
               echo "⚠️ Binary not found at expected path: $BINARY_PATH"
-              echo "Checking binary name from Info.plist..."
               plutil -p "$APP_PATH/Info.plist" || true
             fi
           else
             echo "❌ No .app bundle found in bin folder!"
-            echo "Contents of bin folder:"
             find OpenUtauMobile.iOS/bin -type d -maxdepth 3 2>/dev/null || echo "No bin folder"
             exit 1
           fi
@@ -174,4 +168,4 @@ jobs:
           path: |
             OpenUtauMobile.iOS/bin/
             OpenUtauMobile.iOS/obj/
-         retention-days: 7
+          retention-days: 7
